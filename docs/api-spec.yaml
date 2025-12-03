@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: RAGme API
+  description: API for querying and managing the RAGme knowledge base
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: API Service
+  - url: http://localhost:8001
+    description: Ingestion Service
+
+tags:
+  - name: query
+    description: Query operations
+  - name: ingestion
+    description: Document ingestion operations
+  - name: health
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Check if the service is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: api
+
+  /query:
+    post:
+      tags:
+        - query
+      summary: Query knowledge base
+      description: Search the knowledge base using semantic search
+      operationId: queryKnowledgeBase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Successful query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /search:
+    get:
+      tags:
+        - query
+      summary: Simple search
+      description: Simple GET endpoint for searching
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ingest:
+    post:
+      tags:
+        - ingestion
+      summary: Ingest document
+      description: Ingest a document into the knowledge base
+      operationId: ingestDocument
+      servers:
+        - url: http://localhost:8001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '200':
+          description: Document ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ingest/file:
+    post:
+      tags:
+        - ingestion
+      summary: Ingest file
+      description: Ingest a file into the knowledge base
+      operationId: ingestFile
+      servers:
+        - url: http://localhost:8001
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to ingest
+              required:
+                - file
+      responses:
+        '200':
+          description: File ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '400':
+          description: Invalid file format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    QueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query
+          example: machine learning basics
+        limit:
+          type: integer
+          description: Maximum number of results
+          default: 5
+          minimum: 1
+          maximum: 100
+
+    QueryResponse:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Original query
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentResult'
+        context:
+          type: string
+          description: Formatted context from retrieved documents
+        num_results:
+          type: integer
+          description: Number of results returned
+
+    DocumentResult:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Document text content
+        score:
+          type: number
+          format: float
+          description: Similarity score
+        document_id:
+          type: string
+          description: Unique document identifier
+        chunk_index:
+          type: integer
+          description: Index of the chunk within the document
+        metadata:
+          type: object
+          description: Additional metadata
+          additionalProperties: true
+
+    Document:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          description: Document content
+        metadata:
+          type: object
+          description: Optional metadata
+          additionalProperties: true
+
+    IngestionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Ingestion status
+          example: success
+        document_id:
+          type: string
+          description: Unique document identifier
+        chunks_created:
+          type: integer
+          description: Number of chunks created
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message

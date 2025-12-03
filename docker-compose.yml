@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Vector database for storing embeddings
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ingestion service for processing documents
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - VECTOR_DB_HOST=qdrant
+      - VECTOR_DB_PORT=6333
+      - COLLECTION_NAME=documents
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIMENSION=384
+      - CHUNK_SIZE=512
+      - CHUNK_OVERLAP=50
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API service for querying the knowledge base
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - VECTOR_DB_HOST=qdrant
+      - VECTOR_DB_PORT=6333
+      - COLLECTION_NAME=documents
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIMENSION=384
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend service
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+      - INGESTION_URL=http://ingestion:8001
+    depends_on:
+      - api
+      - ingestion
+
+volumes:
+  qdrant_data:
