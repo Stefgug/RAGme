@@ -1,11 +1,16 @@
 """Storage utilities for the RAGme application."""
 
+import hashlib
+import logging
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from .config import config
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStorage:
@@ -50,8 +55,10 @@ class VectorStorage:
         if recreate:
             try:
                 self.client.delete_collection(self.collection_name)
-            except Exception:
-                pass
+            except UnexpectedResponse as e:
+                logger.debug("Collection %s does not exist: %s", self.collection_name, e)
+            except Exception as e:
+                logger.warning("Error deleting collection %s: %s", self.collection_name, e)
 
         try:
             self.client.create_collection(
@@ -60,9 +67,11 @@ class VectorStorage:
                     size=dimension, distance=models.Distance.COSINE
                 ),
             )
-        except Exception:
+        except UnexpectedResponse as e:
             # Collection already exists
-            pass
+            logger.debug("Collection %s already exists: %s", self.collection_name, e)
+        except Exception as e:
+            logger.warning("Error creating collection %s: %s", self.collection_name, e)
 
     def upsert(
         self,
@@ -82,9 +91,12 @@ class VectorStorage:
             for i, (embedding, payload) in enumerate(zip(embeddings, payloads))
         ]
 
-        # Use provided IDs for the point IDs
+        # Use provided IDs for the point IDs with deterministic hash
         for idx, point_id in enumerate(ids):
-            points[idx].id = hash(point_id) % (2**63)
+            # Use SHA-256 for deterministic hashing across sessions
+            hash_bytes = hashlib.sha256(point_id.encode()).digest()
+            # Convert first 8 bytes to unsigned 64-bit integer
+            points[idx].id = int.from_bytes(hash_bytes[:8], byteorder="big") % (2**63)
 
         self.client.upsert(collection_name=self.collection_name, points=points)
 

@@ -1,6 +1,7 @@
 """API service for RAGme application."""
 
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
@@ -14,10 +15,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from rag_pipeline import rag_pipeline
 from shared.storage import vector_storage
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup: Initialize storage
+    vector_storage.create_collection()
+    yield
+    # Shutdown: cleanup if needed
+
+
 app = FastAPI(
     title="RAGme API",
     description="API for querying the RAG knowledge base",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware for frontend access
@@ -54,12 +66,6 @@ class QueryResponse(BaseModel):
     results: List[DocumentResult]
     context: str
     num_results: int
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize storage on startup."""
-    vector_storage.create_collection()
 
 
 @app.get("/health")

@@ -3,6 +3,7 @@
 import hashlib
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
@@ -16,10 +17,21 @@ from shared.config import config
 from shared.embeddings import embedding_model
 from shared.storage import vector_storage
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup: Initialize storage
+    vector_storage.create_collection()
+    yield
+    # Shutdown: cleanup if needed
+
+
 app = FastAPI(
     title="RAGme Ingestion Service",
     description="Service for ingesting and processing documents",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -80,14 +92,8 @@ def generate_document_id(content: str) -> str:
     Returns:
         Unique document ID.
     """
-    content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+    content_hash = hashlib.sha256(content.encode()).hexdigest()[:8]
     return f"doc_{content_hash}_{uuid.uuid4().hex[:8]}"
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize storage on startup."""
-    vector_storage.create_collection()
 
 
 @app.get("/health")
