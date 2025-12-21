@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -7,3 +6,26 @@ services:
     volumes:
       - ./qdrant_storage:/qdrant/storage
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    depends_on:
+      - qdrant
+
+  rag-api:
+  build: .
+  ports: ["8000:8000"]
+  depends_on: [qdrant, ollama]
+  environment:
+    - QDRANT_URL=http://qdrant:6333
+    - OLLAMA_URL=http://ollama:11434

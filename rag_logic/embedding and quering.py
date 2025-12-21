@@ -4,6 +4,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
+import requests
+
 from tqdm import tqdm
 
 
@@ -45,3 +47,25 @@ for idx, vector in tqdm(enumerate(embeddings_list), total=len(embeddings_list)):
         ]
     )
 print("Documents embedded and stored in Qdrant successfully")
+
+# Example query to generate a response using the stored documents
+text = qdrant_client.query_points(
+    collection_name="documents_collection",
+    query=embeddings.embed_query("What is this document about?"),
+)
+
+
+reponse = requests.post(
+    "http://localhost:11434/api/generate",
+    json={
+        "model":"mistral:latest",
+        "prompt": f"Question: What is the main topic of the document {text}?  \nAnswer:",
+        "max_new_tokens": 256,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "stream": False
+    }
+)
+
+print("Response from the model:")
+print(reponse.json()['response'])
