@@ -1,19 +1,9 @@
 [project]
 name = "ragme"
 version = "0.1.0"
-description = "Add your description here"
+description = "RAGme project. Retrieval-Augmented Generation for starred GitHub repositories, Notion pages and bookmarked X links."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.127.0",
-    "langchain>=1.2.0",
-    "langchain-community>=0.4.1",
-    "langchain-huggingface>=1.1.0",
-    "langchain-qdrant>=1.1.0",
-    "langchain-text-splitters>=1.0.0",
-    "ollama>=0.6.1",
-    "pypdf>=6.4.1",
-    "qdrant-client>=1.16.1",
-    "sentence-transformers>=5.1.2",
-    "tqdm>=4.67.1",
+    "lightrag-hku[api]>=1.4.9.10",
 ]
